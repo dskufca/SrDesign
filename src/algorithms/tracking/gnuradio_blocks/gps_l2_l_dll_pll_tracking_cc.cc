@@ -346,4 +346,47 @@ int gps_l2_l_dll_pll_tracking_cc::general_work (int noutput_items __attribute__(
             d_rem_code_phase_samples = K_blk_samples - d_current_prn_length_samples; // rounding error < 1 sample
             d_rem_code_phase_chips = d_code_freq_chips * (d_rem_code_phase_samples / static_cast<double>(d_fs_in));
 
+            // ####### CN0 ESTIMATION AND LOCK DETECTORS ######
+            if (d_cn0_estimation_counter < GPS_L2L_CN0_ESTIMATION_SAMPLES)
+                {
+                    // fill buffer with prompt correlator output values
+                    d_Prompt_buffer[d_cn0_estimation_counter] = d_correlator_outs[1];
+                    d_cn0_estimation_counter++;
+                }
+            else
+                {
+                    d_cn0_estimation_counter = 0;
+                    // Code lock indicator
+                    d_CN0_SNV_dB_Hz = cn0_svn_estimator(d_Prompt_buffer, GPS_L2L_CN0_ESTIMATION_SAMPLES, d_fs_in, GPS_L2_L_CODE_LENGTH_CHIPS);
+                    // Carrier lock indicator
+                    d_carrier_lock_test = carrier_lock_detector(d_Prompt_buffer, GPS_L2L_CN0_ESTIMATION_SAMPLES);
+                    // Loss of lock detection
+                    if (d_carrier_lock_test < d_carrier_lock_threshold or d_CN0_SNV_dB_Hz < GPS_L2L_MINIMUM_VALID_CN0)
+                        {
+                            d_carrier_lock_fail_counter++;
+                        }
+                    else
+                        {
+                            if (d_carrier_lock_fail_counter > 0) d_carrier_lock_fail_counter--;
+                        }
+                    if (d_carrier_lock_fail_counter > GPS_L2L_MAXIMUM_LOCK_FAIL_COUNTER)
+                        {
+                            std::cout << "Loss of lock in channel " << d_channel << "!" << std::endl;
+                            LOG(INFO) << "Loss of lock in channel " << d_channel << "!";
+                            this->message_port_pub(pmt::mp("events"), pmt::from_long(3));//3 -> loss of lock
+                            d_carrier_lock_fail_counter = 0;
+                            d_enable_tracking = false; // TODO: check if disabling tracking is consistent with the channel state machine
+                        }
+                }
+            // ########### Output the tracking data to navigation and PVT ##########
+            current_synchro_data.Prompt_I = static_cast<double>(d_correlator_outs[1].real());
+            current_synchro_data.Prompt_Q = static_cast<double>(d_correlator_outs[1].imag());
+            // Tracking_timestamp_secs is aligned with the CURRENT PRN start sample
+            current_synchro_data.Tracking_timestamp_secs = (static_cast<double>(d_sample_counter + d_current_prn_length_samples) + static_cast<double>(d_rem_code_phase_samples)) / static_cast<double>(d_fs_in);
+            current_synchro_data.Carrier_phase_rads = d_acc_carrier_phase_rad;
+            current_synchro_data.Carrier_Doppler_hz = d_carrier_doppler_hz;
+            current_synchro_data.CN0_dB_hz = d_CN0_SNV_dB_Hz;
+            current_synchro_data.Flag_valid_symbol_output = true;
+            current_synchro_data.correlation_length_ms = 20;
+
 
