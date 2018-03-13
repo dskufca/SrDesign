@@ -389,4 +389,103 @@ int gps_l2_l_dll_pll_tracking_cc::general_work (int noutput_items __attribute__(
             current_synchro_data.Flag_valid_symbol_output = true;
             current_synchro_data.correlation_length_ms = 20;
 
+        }
+    else
+        {
+            for (int n = 0; n < d_n_correlator_taps; n++)
+                {
+                    d_correlator_outs[n] = gr_complex(0,0);
+                }
+            current_synchro_data.Tracking_timestamp_secs = (static_cast<double>(d_sample_counter + d_current_prn_length_samples) + static_cast<double>(d_rem_code_phase_samples)) / static_cast<double>(d_fs_in);
+        }
+    //assign the GNURadio block output data
+    *out[0] = current_synchro_data;
+
+    if(d_dump)
+        {
+            // MULTIPLEXED FILE RECORDING - Record results to file
+            float prompt_I;
+            float prompt_Q;
+            float tmp_E, tmp_P, tmp_L;
+            double tmp_double;
+            prompt_I = d_correlator_outs[1].real();
+            prompt_Q = d_correlator_outs[1].imag();
+            tmp_E = std::abs<float>(d_correlator_outs[0]);
+            tmp_P = std::abs<float>(d_correlator_outs[1]);
+            tmp_L = std::abs<float>(d_correlator_outs[2]);
+            try
+            {
+                    // EPR
+                    d_dump_file.write(reinterpret_cast<char*>(&tmp_E), sizeof(float));
+                    d_dump_file.write(reinterpret_cast<char*>(&tmp_P), sizeof(float));
+                    d_dump_file.write(reinterpret_cast<char*>(&tmp_L), sizeof(float));
+                    // PROMPT I and Q (to analyze navigation symbols)
+                    d_dump_file.write(reinterpret_cast<char*>(&prompt_I), sizeof(float));
+                    d_dump_file.write(reinterpret_cast<char*>(&prompt_Q), sizeof(float));
+                    // PRN start sample stamp
+                    //tmp_float=(float)d_sample_counter;
+                    d_dump_file.write(reinterpret_cast<char*>(&d_sample_counter), sizeof(unsigned long int));
+                    // accumulated carrier phase
+                    d_dump_file.write(reinterpret_cast<char*>(&d_acc_carrier_phase_rad), sizeof(double));
+
+                    // carrier and code frequency
+                    d_dump_file.write(reinterpret_cast<char*>(&d_carrier_doppler_hz), sizeof(double));
+                    d_dump_file.write(reinterpret_cast<char*>(&d_code_freq_chips), sizeof(double));
+
+                    //PLL commands
+                    d_dump_file.write(reinterpret_cast<char*>(&carr_error_hz), sizeof(double));
+                    d_dump_file.write(reinterpret_cast<char*>(&d_carrier_doppler_hz), sizeof(double));
+
+                    //DLL commands
+                    d_dump_file.write(reinterpret_cast<char*>(&code_error_chips), sizeof(double));
+                    d_dump_file.write(reinterpret_cast<char*>(&code_error_filt_chips), sizeof(double));
+
+                    // CN0 and carrier lock test
+                    d_dump_file.write(reinterpret_cast<char*>(&d_CN0_SNV_dB_Hz), sizeof(double));
+                    d_dump_file.write(reinterpret_cast<char*>(&d_carrier_lock_test), sizeof(double));
+
+                    // AUX vars (for debug purposes)
+                    tmp_double = d_rem_code_phase_samples;
+                    d_dump_file.write(reinterpret_cast<char*>(&tmp_double), sizeof(double));
+                    tmp_double = static_cast<double>(d_sample_counter + d_current_prn_length_samples);
+                    d_dump_file.write(reinterpret_cast<char*>(&tmp_double), sizeof(double));
+            }
+            catch (std::ifstream::failure& e)
+            {
+                    LOG(WARNING) << "Exception writing trk dump file " << e.what();
+            }
+        }
+    consume_each(d_current_prn_length_samples); // this is necessary in gr::block derivates
+    d_sample_counter += d_current_prn_length_samples; // count for the processed samples
+    return 1; // output tracking result ALWAYS even in the case of d_enable_tracking==false
+}
+
+
+
+void gps_l2_l_dll_pll_tracking_cc::set_channel(unsigned int channel)
+{
+    d_channel = channel;
+    LOG(INFO) << "Tracking Channel set to " << d_channel;
+    // ############# ENABLE DATA FILE LOG #################
+    if (d_dump == true)
+        {
+            if (d_dump_file.is_open() == false)
+                {
+                    try
+                    {
+                            d_dump_filename.append(boost::lexical_cast<std::string>(d_channel));
+                            d_dump_filename.append(".dat");
+                            d_dump_file.exceptions (std::ifstream::failbit | std::ifstream::badbit);
+                            d_dump_file.open(d_dump_filename.c_str(), std::ios::out | std::ios::binary);
+                            LOG(INFO) << "Tracking dump enabled on channel " << d_channel << " Log file: " << d_dump_filename.c_str();
+                    }
+                    catch (std::ifstream::failure& e)
+                    {
+                            LOG(WARNING) << "channel " << d_channel << " Exception opening trk dump file " << e.what();
+                    }
+                }
+        }
+}
+
+
 
