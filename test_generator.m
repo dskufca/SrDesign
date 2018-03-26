@@ -9,7 +9,7 @@ modulation = 'L1CA';
 fs = 1.023e6;
 prn_chips = 1023;
 prn_time = 1e-3;
-n_periods = 1;
+n_periods = 1000;
 
 %---- Example 2: LI C/A (higher frequency)
 % modulation = 'L1CA';
@@ -62,7 +62,7 @@ IQsamps((1:length(I))*2 - 1) = I;
 IQsamps((1:length(Q))*2) = Q;
 
 
-fileID = fopen('/Users/camilamenard/Desktop/samples.dat', 'w');
+fileID = fopen('~/Documents/SeniorYr/Sr_Design/GNSS-SDR/SrDesign/install/samples.dat', 'w');
 fwrite(fileID, IQsamps, 'int16');
 fclose(fileID);
 
