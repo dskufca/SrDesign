@@ -488,4 +488,7 @@ void gps_l2_l_dll_pll_tracking_cc::set_channel(unsigned int channel)
 }
 
 
-
+void gps_l2_l_dll_pll_tracking_cc::set_gnss_synchro(Gnss_Synchro* p_gnss_synchro)
+{
+    d_acquisition_gnss_synchro = p_gnss_synchro;
+}
