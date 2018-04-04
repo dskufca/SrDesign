@@ -121,5 +121,10 @@ void gps_l2c_m_code_gen_complex_sampled(std::complex<float>* _dest, unsigned int
 }
 
 
+//////////// L2CL CODE GENERATION /////////////
+
+int32_t gps_l2c_m_shift(int32_t x)
+{
+}
 
 
