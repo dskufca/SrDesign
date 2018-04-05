@@ -123,8 +123,37 @@ void gps_l2c_m_code_gen_complex_sampled(std::complex<float>* _dest, unsigned int
 
 //////////// L2CL CODE GENERATION /////////////
 
-int32_t gps_l2c_m_shift(int32_t x)
+int32_t gps_l2c_l_shift(int32_t x)
 {
+    return static_cast<int32_t>((x >> 1)^((x & 1) * 0445112474));
 }
 
+void gps_l2c_l_code(int32_t * _dest, unsigned int _prn)
+{
+    int32_t x;
+    x = GPS_L2C_L_INIT_REG[ _prn - 1];
+    for (int n = 0; n < GPS_L2_L_CODE_LENGTH_CHIPS; n++)
+        {
+            _dest[n] = (int8_t)(x&1);
+            x = gps_l2c_l_shift(x);
+        }
+}
+
+
+void gps_l2c_l_code_gen_complex(std::complex<float>* _dest, unsigned int _prn)
+{
+    int32_t* _code = new int32_t[GPS_L2_L_CODE_LENGTH_CHIPS];
+
+    if (_prn > 0 and _prn < 51)
+        {
+            gps_l2c_l_code(_code, _prn);
+        }
+
+    for (signed int i = 0; i < GPS_L2_L_CODE_LENGTH_CHIPS; i++)
+        {
+            _dest[i] = std::complex<float>(1.0 - 2.0 * _code[i], 0.0);
+        }
+
+    delete[] _code;
+}
 
